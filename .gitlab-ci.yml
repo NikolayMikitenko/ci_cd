@@ -1,0 +1,355 @@
+stages:
+    - buildenv    
+    - collect
+    - test
+    - buildenv_on_test
+    - deploy_to_test
+    - test_on_test
+    - buildenv_on_production
+    - deploy_to_production
+    - test_on_production
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+
+create_conda_env:
+    stage: buildenv
+    script:
+        - mkdir ci
+        - curl -k -o ci/env.sh https://gitlab.com/files/ci%2Fenv.sh/raw?ref=master
+        - chmod +x ./ci/env.sh
+        - ./ci/env.sh
+    rules:       
+        - if: '$CI_COMMIT_REF_NAME != "test" && $CI_COMMIT_REF_NAME != $CI_DEFAULT_BRANCH'
+    tags:
+        - shell
+        - dev
+    environment: development
+    artifacts:
+        reports:
+            dotenv: buildenv.env
+
+collect_files:
+    stage: collect
+    script:
+        - mkdir ci
+        - curl -k -o ci/collect.sh https://gitlab.com/files/ci%2Fcollect.sh/raw?ref=master
+        - ls ci
+        - chmod +x ./ci/collect.sh
+        - ./ci/collect.sh       
+    rules:
+        - if: '$CI_COMMIT_REF_NAME != "test" && $CI_COMMIT_REF_NAME != $CI_DEFAULT_BRANCH'                
+    tags:
+        - shell
+        - dev
+    environment: development
+    artifacts:
+        reports:
+            dotenv: collect.env
+
+test_predict:
+    stage: test
+    script: 
+        - mkdir ci
+        - curl -k -o ci/predict.sh https://gitlab.com/files/ci%2Fpredict.sh/raw?ref=master
+        - chmod +x ./ci/predict.sh
+        - ./ci/predict.sh   
+    dependencies:
+        - create_conda_env  
+        - collect_files
+    rules:
+        - if: '$CI_COMMIT_REF_NAME != "test" && $CI_COMMIT_REF_NAME != $CI_DEFAULT_BRANCH'
+    tags:
+        - shell
+        - dev
+
+pytest:
+    stage: test
+    script:.com/files/
+        - mkdir ci
+        - curl -k -o ci/pytest.sh https://gitlab.com/files/ci%2Fpytest.sh/raw?ref=master
+        - chmod +x ./ci/pytest.sh
+        - ./ci/pytest.sh   
+    dependencies:
+        - create_conda_env   
+        - collect_files     
+    rules:
+        - if: '$CI_COMMIT_REF_NAME != "test" && $CI_COMMIT_REF_NAME != $CI_DEFAULT_BRANCH'
+    tags:
+        - shell
+        - dev
+    artifacts:
+        when: always
+        reports:
+            junit: report.xml
+
+create_conda_env_on_test_1:
+    stage: buildenv_on_test
+    script:
+        - mkdir ci
+        - curl -k -o ci/env.sh https://gitlab.com/files/ci%2Fenv.sh/raw?ref=master
+        - chmod +x ./ci/env.sh
+        - ./ci/env.sh        
+    rules:
+        - if: '$CI_COMMIT_REF_NAME == "test"'
+    tags:
+        - shell
+        - test
+        - master
+    environment: test
+    artifacts:
+        reports:
+            dotenv: buildenv.env
+
+create_conda_env_on_test_2:
+    stage: buildenv_on_test
+    script:
+        - mkdir ci
+        - curl -k -o ci/env.sh https://gitlab.com/files/ci%2Fenv.sh/raw?ref=master
+        - chmod +x ./ci/env.sh
+        - ./ci/env.sh
+    rules:
+        - if: '$CI_COMMIT_REF_NAME == "test"'
+    tags:
+        - shell
+        - test
+        - slave
+    artifacts:
+        reports:
+            dotenv: buildenv.env
+    
+
+collect_files_on_test_1:
+    stage: deploy_to_test
+    script:
+        - mkdir ci
+        - curl -k -o ci/collect.sh https://gitlab.com/files/ci%2Fcollect.sh/raw?ref=master
+        - ls ci
+        - chmod +x ./ci/collect.sh
+        - ./ci/collect.sh 
+    rules:
+        - if: '$CI_COMMIT_REF_NAME == "test"'
+    tags:
+        - shell
+        - test
+        - master
+    environment: test
+    artifacts:
+        reports:
+            dotenv: collect.env
+
+collect_files_on_test_2:
+    stage: deploy_to_test
+    script:
+        - mkdir ci
+        - curl -k -o ci/collect.sh https://gitlab.com/files/ci%2Fcollect.sh/raw?ref=master
+        - ls ci
+        - chmod +x ./ci/collect.sh
+        - ./ci/collect.sh 
+    rules:
+        - if: '$CI_COMMIT_REF_NAME == "test"'
+    tags:
+        - shell
+        - test
+        - slave
+    artifacts:
+        reports:
+            dotenv: collect.env
+
+test_predict_on_test_1:
+    stage: test_on_test
+    script: 
+        - mkdir ci
+        - curl -k -o ci/predict.sh https://gitlab.com/files/ci%2Fpredict.sh/raw?ref=master
+        - chmod +x ./ci/predict.sh
+        - ./ci/predict.sh   
+    dependencies:
+        - create_conda_env_on_test_1  
+        - collect_files_on_test_1
+    rules:
+        - if: '$CI_COMMIT_REF_NAME == "test"'   
+    tags:
+        - shell
+        - test
+        - master
+
+test_predict_on_test_2:
+    stage: test_on_test
+    script: 
+        - mkdir ci
+        - curl -k -o ci/predict.sh https://gitlab.com/files/ci%2Fpredict.sh/raw?ref=master
+        - chmod +x ./ci/predict.sh
+        - ./ci/predict.sh   
+    dependencies:
+        - create_conda_env_on_test_2  
+        - collect_files_on_test_2
+    rules:
+        - if: '$CI_COMMIT_REF_NAME == "test"'
+    tags:
+        - shell
+        - test
+        - slave
+
+pytest_on_test_1:
+    stage: test_on_test
+    script:
+        - mkdir ci
+        - curl -k -o ci/pytest.sh https://gitlab.com/files/ci%2Fpytest.sh/raw?ref=master
+        - chmod +x ./ci/pytest.sh
+        - ./ci/pytest.sh   
+    dependencies:
+        - create_conda_env_on_test_1
+        - collect_files_on_test_1
+    rules:
+        - if: '$CI_COMMIT_REF_NAME == "test"'
+    tags:
+        - shell
+        - test
+        - master
+    artifacts:
+        when: always
+        reports:
+            junit: report.xml
+
+pytest_on_test_2:
+    stage: test_on_test
+    script:
+        - mkdir ci
+        - curl -k -o ci/pytest.sh https://gitlab.com/files/ci%2Fpytest.sh/raw?ref=master
+        - chmod +x ./ci/pytest.sh
+        - ./ci/pytest.sh   
+    dependencies:
+        - create_conda_env_on_test_2  
+        - collect_files_on_test_2    
+    rules:
+        - if: '$CI_COMMIT_REF_NAME == "test"'
+    tags:
+        - shell
+        - test
+        - slave
+    artifacts:
+        when: always
+        reports:
+            junit: report.xml
+
+create_conda_env_on_production_1:
+    stage: buildenv_on_production
+    script:
+        - mkdir ci
+        - curl -k -o ci/env.sh https://gitlab.com/files/ci%2Fenv.sh/raw?ref=master
+        - chmod +x ./ci/env.sh
+        - ./ci/env.sh
+    when: manual
+    allow_failure: false
+    only:
+        - master
+    tags:
+        - shell
+        - production
+        - master        
+    environment: production
+    artifacts:
+        reports:
+            dotenv: buildenv.env
+
+create_conda_env_on_production_2:
+    stage: buildenv_on_production
+    script:
+        - mkdir ci
+        - curl -k -o ci/env.sh https://gitlab.com/files/ci%2Fenv.sh/raw?ref=master
+        - chmod +x ./ci/env.sh
+        - ./ci/env.sh
+    when: manual
+    allow_failure: false
+    only:
+        - master              
+    tags:
+        - shell
+        - production
+        - slave        
+    artifacts:
+        reports:
+            dotenv: buildenv.env
+
+collect_files_on_production_1:
+    stage: deploy_to_production
+    script:
+        - mkdir ci
+        - curl -k -o ci/collect.sh https://gitlab.com/files/ci%2Fcollect.sh/raw?ref=master
+        - ls ci
+        - chmod +x ./ci/collect.sh
+        - ./ci/collect.sh 
+    rules:
+        - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    tags:
+        - shell
+        - production
+        - master     
+    environment: production
+    artifacts:
+        reports:
+            dotenv: collect.env
+
+collect_files_on_production_2:
+    stage: deploy_to_production
+    script:
+        - mkdir ci
+        - curl -k -o ci/collect.sh https://gitlab.com/files/ci%2Fcollect.sh/raw?ref=master
+        - ls ci
+        - chmod +x ./ci/collect.sh
+        - ./ci/collect.sh 
+    rules:
+        - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    tags:
+        - shell
+        - production
+        - slave     
+    artifacts:
+        reports:
+            dotenv: collect.env
+
+pytest_on_production_1:
+    stage: test_on_production
+    script:
+        - mkdir ci
+        - curl -k -o ci/pytest.sh https://gitlab.com/files/ci%2Fpytest.sh/raw?ref=master
+        - chmod +x ./ci/pytest.sh
+        - ./ci/pytest.sh   
+    dependencies:
+        - create_conda_env_on_production_1
+        - collect_files_on_production_1
+    rules:
+        - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    tags:
+        - shell
+        - production
+        - master     
+    artifacts:
+        when: always
+        reports:
+            junit: report.xml
+
+pytest_on_production_2:
+    stage: test_on_production
+    script:
+        - mkdir ci
+        - curl -k -o ci/pytest.sh https://gitlab.com/files/ci%2Fpytest.sh/raw?ref=master
+        - chmod +x ./ci/pytest.sh
+        - ./ci/pytest.sh   
+    dependencies:
+        - create_conda_env_on_production_2
+        - collect_files_on_production_2
+    tags:
+        - shell
+        - production
+        - slave     
+    rules:
+        - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'        
+    artifacts:
+        when: always
+        reports:
+            junit: report.xml
