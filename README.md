@@ -1,4 +1,5 @@
-# ci_cd
+# ci_cd on gitlab
+
 ## Development environment
 ![image](https://user-images.githubusercontent.com/52753625/204407201-f0b13253-028e-4298-8272-86dfc7303003.png)
 
